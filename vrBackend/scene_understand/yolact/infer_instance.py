@@ -4,12 +4,12 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-from scene_understand.yolact.data import cfg, mask_type
-from scene_understand.yolact.layers.box_utils import crop, sanitize_coordinates, center_size
-from scene_understand.yolact.layers.output_utils import display_lincomb, undo_image_transformation
-from scene_understand.yolact.utils import timer
-from scene_understand.yolact.utils.augmentations import FastBaseTransform, Resize
-from scene_understand.yolact.yolact import Yolact
+from .data import cfg, mask_type
+from .layers.box_utils import crop, sanitize_coordinates, center_size
+from .layers.output_utils import display_lincomb, undo_image_transformation
+from .utils import timer
+from .utils.augmentations import FastBaseTransform, Resize
+from .yolact import Yolact
 
 COLORS = ((244, 67, 54),
           (233, 30, 99),

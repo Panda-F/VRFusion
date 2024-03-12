@@ -9,14 +9,13 @@ from itertools import product
 from math import sqrt
 from typing import List
 
-from scene_understand.yolact.data.config import cfg, mask_type
-from scene_understand.yolact.layers import Detect
-from scene_understand.yolact.layers.interpolate import InterpolateModule
-from scene_understand.yolact.backbone import construct_backbone
+from .data.config import cfg, mask_type
+from .layers import Detect
+from .layers.interpolate import InterpolateModule
+from .backbone import construct_backbone
 
 import torch.backends.cudnn as cudnn
-from scene_understand.yolact.utils import timer
-from scene_understand.yolact.utils.functions import MovingAverage
+from .utils import timer
 
 # This is required for Pytorch 1.0.1 on Windows to initialize Cuda on some driver versions.
 # See the bug report here: https://github.com/pytorch/pytorch/issues/17108

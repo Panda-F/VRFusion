@@ -8,14 +8,14 @@ import numpy as np
 import torch
 from torchvision.transforms import transforms
 
-from scene_understand.GlobalConfig import Config
-from scene_understand.monodepth import networks
-from scene_understand.yolact.data import cfg
+from GlobalConfig import Config
+from monodepth import networks
+from yolact.data import cfg
 import cv2
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 
-from scene_understand.yolact.infer_instance import InstancePerception
+from yolact.infer_instance import InstancePerception
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 

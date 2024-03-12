@@ -7,8 +7,8 @@ import torch
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from scene_understand.GlobalConfig import Config
-from scene_understand.image_synthesis import ImageSynthesis
+from GlobalConfig import Config
+from image_synthesis import ImageSynthesis
 
 # from scene_understand.yolact.infer_instance import InstancePerception
 
@@ -34,8 +34,8 @@ class SceneUnderstand:
         return fg_mask
 
     def merge_vedio(self):
-        video = cv2.VideoCapture(r"F:\Projects\VRFusion\static\materials\stage_cut_3.mp4")
-        video2 = cv2.VideoCapture(r"F:\Projects\VRFusion\static\materials\horse.mp4")
+        video = cv2.VideoCapture("../static/materials/Coldplay - Viva La Vida-(1080p).mp4")
+        video2 = cv2.VideoCapture("../static/materials/dance.mp4")
         fps = video.get(cv2.CAP_PROP_FPS)  # 帧速率
         fps2 = video2.get(cv2.CAP_PROP_FPS)  # 帧速率
 

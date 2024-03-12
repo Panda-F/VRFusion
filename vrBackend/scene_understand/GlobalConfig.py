@@ -1,10 +1,10 @@
 import os
 
-from scene_understand.monodepth.utils import download_model_if_doesnt_exist
+from monodepth.utils import download_model_if_doesnt_exist
 
 
 class Config:
-    ROOT_PATH = r"F:\Projects\VRFusion\scene_understand\checkpoints"
+    ROOT_PATH = r"/home/fangzhou/Checkpoints"
 
     instance_split_model = os.path.join(ROOT_PATH, "yolact_im700_54_800000.pth")
 

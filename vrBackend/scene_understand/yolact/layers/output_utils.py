@@ -7,9 +7,9 @@ import torch.nn.functional as F
 import numpy as np
 import cv2
 
-from scene_understand.yolact.data import cfg, mask_type, MEANS, STD, activation_func
-from scene_understand.yolact.utils.augmentations import Resize
-from scene_understand.yolact.utils import timer
+from ..data import cfg, mask_type, MEANS, STD, activation_func
+from ..utils.augmentations import Resize
+from ..utils import timer
 from .box_utils import crop, sanitize_coordinates
 
 def postprocess(det_output, w, h, batch_idx=0, interpolation_mode='bilinear',
