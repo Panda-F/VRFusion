@@ -10,31 +10,31 @@ from torchvision.transforms import transforms
 
 from GlobalConfig import Config
 from monodepth import networks
-from yolact.data import cfg
 import cv2
 from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
-
-from yolact.infer_instance import InstancePerception
+from mmdet.apis import DetInferencer
+import pycocotools.mask as mask_utils
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 class ImageSynthesis:
     def __init__(self, config):
-        self.instance_model = config.instance_split_model
+        model = "/home/fangzhou/Project/mmdetection/configs/rtmdet/rtmdet-ins_tiny_8xb32-300e_coco.py"
+        weights = "/home/fangzhou/Checkpoints/rtmdet-ins_tiny_8xb32-300e_coco_20221130_151727-ec670f7e.pth"
+        self.segment_inferencer = DetInferencer(model=model, weights=weights)
         self.encoder_path = config.encoder_path
         self.depth_decoder_path = config.depth_decoder_path
 
     def estimate_instance(self, image):
-        instance_perception = InstancePerception(self.instance_model)
-        classes, scores, boxes, masks = instance_perception.infer(image)
-        instance_lst = []
-        for index, mask in enumerate(masks):
-            instance_dict = {'mask': mask.cuda(), 'score': scores[index],
-                             'class': cfg.dataset.class_names[classes[index]], 'box': masks[index]}
-            instance_lst.append(instance_dict)
-        return instance_lst
+        seg_res = self.segment_inferencer(image)["predictions"][0]
+        labels = seg_res['labels']
+        scores = seg_res['scores']
+        bboxes = seg_res['bboxes']
+        masks = np.array(mask_utils.decode(seg_res['masks']), dtype=np.float32).transpose(2, 0, 1)
+        labels, scores, bboxes, masks = self.nms(labels, scores, bboxes, masks, 0.5)
+        return labels, scores, bboxes, masks
 
     def estimate_depth(self, image):
         image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
@@ -71,45 +71,78 @@ class ImageSynthesis:
 
         return disp_resized
 
-    def occlusion_handling(self, image, is_geo=False):
-        start_time = time.time()
-        instances = self.estimate_instance(image)
-        end_time = time.time()
-        print("实例分割模块耗时：" + f"{end_time - start_time:.4f}s")
-        start_time = time.time()
-        depth = self.estimate_depth(image)[0][0].cuda()
-        end_time = time.time()
-        print("深度估计模块耗时：" + f"{end_time - start_time:.4f}s")
-        for i in instances:
-            mask = i['mask'].cuda()
+    def scene_understand(self, image, is_geo=False):
+        # start_time = time.time()
+        labels, scores, bboxes, masks = self.estimate_instance(image)
+        # end_time = time.time()
+        # print("实例分割模块耗时：" + f"{end_time - start_time:.4f}s")
+        # start_time = time.time()
+        depths = self.estimate_depth(image)[0][0].cuda()
+        # end_time = time.time()
+        # print("深度估计模块耗时：" + f"{end_time - start_time:.4f}s")
+        inst_depths = []
+        for mask in masks:
+            mask = torch.tensor(mask).cuda()
             pixel_count = mask.sum()
-            instances_depth = torch.mul(mask, depth).sum()
-            i['depth'] = instances_depth / pixel_count
-            i['depth'] = float(i['depth'].cpu().numpy())
-            i['score'] = float(i['score'].cpu().numpy())
-        instances = sorted(instances, key=lambda x: x['depth'])
-        if not is_geo:
-            return instances
-        else:
-            for instance in instances:
-                instance['mask'] = self.mask2geojson(instance['mask'])
-            return instances
+            instances_depth = torch.mul(mask, depths).sum()
+            inst_depths.append(instances_depth / pixel_count)
+        res = sorted(zip(labels, scores, bboxes, masks, inst_depths), key=lambda x: x[4])
+        labels, scores, bboxes, masks, inst_depths = zip(*res)
+        return labels, scores, bboxes, masks, inst_depths
 
-    def image_fusion(self, front, background, rate=0.5, x_offset=250, y_offset=150, depth=-1):
-        instances_mask = self.occlusion_handling(background, False)
+    def image_fusion(self, front, background, rate=1.0, x_offset=0, y_offset=500, depth=0.3, score_thresh=0.3):
+        labels, scores, bboxes, masks, inst_depths = self.scene_understand(background)
         front = cv2.resize(front, (int(front.shape[1] * rate), int(front.shape[0] * rate)))
         height, width, _ = background.shape
         mask_entire = torch.empty((height, width)).cuda()
-        for index, instance in enumerate(instances_mask):
-            if instance['score'] >= 0.11:
-                mask = torch.tensor(instance['mask'])
-                mask_entire = torch.logical_or(mask_entire, mask)
-        for x, col in enumerate(front):
-            for y, row in enumerate(col):
-                if (list(row)[0] > 0 or list(row)[1] > 0 or list(row)[2] > 0) and x + x_offset < height and y + y_offset < width:
-                    if not mask_entire[x + y_offset, y + x_offset]:
-                        background[x + y_offset, y + x_offset] = front[x, y]
+        for index, mask in enumerate(masks):
+            if scores[index] > score_thresh and inst_depths[index] < depth and labels[index] in [0, 1, 26]:
+                mask_entire = torch.logical_or(mask_entire, torch.tensor(mask, device="cuda:0"))
+        for y, col in enumerate(front):
+            for x, row in enumerate(col):
+                # if front[y, x][1] <= 200:
+                if sum(front[y, x]) != 0 and (x + x_offset) < width and (y + y_offset) < height and not mask_entire[y + y_offset, x + x_offset]:
+                    background[y + y_offset, x + x_offset] = front[y, x]
         return background
+
+    @staticmethod
+    def nms(labels, scores, bboxes, masks, iou_thresh):
+        """ 非极大值抑制 """
+        labels = np.array(labels)
+        scores = np.array(scores)
+        bboxes = np.array(bboxes)
+        masks = np.array(masks)
+        x1 = bboxes[:, 0]
+        y1 = bboxes[:, 1]
+        x2 = bboxes[:, 2]
+        y2 = bboxes[:, 3]
+        areas = (x2 - x1) * (y2 - y1)
+        keep = []
+
+        # 按置信度进行排序
+        index = np.argsort(scores)[::-1]
+
+        while (index.size):
+            # 置信度最高的框
+            i = index[0]
+            keep.append(index[0])
+
+            if (index.size == 1):  # 如果只剩一个框，直接返回
+                break
+
+            # 计算交集左下角与右上角坐标
+            inter_x1 = np.maximum(x1[i], x1[index[1:]])
+            inter_y1 = np.maximum(y1[i], y1[index[1:]])
+            inter_x2 = np.minimum(x2[i], x2[index[1:]])
+            inter_y2 = np.minimum(y2[i], y2[index[1:]])
+            # 计算交集的面积
+            inter_area = np.maximum(inter_x2 - inter_x1, 0) * np.maximum(inter_y2 - inter_y1, 0)
+            # 计算当前框与其余框的iou
+            iou = inter_area / (areas[index[1:]] + areas[i] - inter_area)
+            ids = np.where(iou < iou_thresh)[0]
+            index = index[ids + 1]
+
+        return labels[keep], scores[keep], bboxes[keep], masks[keep]
 
     @staticmethod
     def mask2geojson(mask):
@@ -131,11 +164,12 @@ class ImageSynthesis:
 
 
 if __name__ == "__main__":
-    background = cv2.imread("C:/Users/24422/Desktop/grassland.jpg")
-    front = cv2.imread("C:/Users/24422/Desktop/people.png")
+    background = cv2.imread("/home/fangzhou/Project/VRFusion/vrBackend/static/img/frame_back_1.png")
+    front = cv2.imread("/home/fangzhou/Project/VRFusion/vrBackend/static/img/frame_front_1.png")
 
     imageSynthesis = ImageSynthesis(Config)
-    fusion = imageSynthesis.image_fusion(front, background)
+    # imageSynthesis.scene_understand(background)
+    fusion = imageSynthesis.image_fusion(front, background, 0.65, 50, 280, 0.5)
     plt.figure()
     plt.imshow(fusion[:, :, ::-1])
     plt.show()
