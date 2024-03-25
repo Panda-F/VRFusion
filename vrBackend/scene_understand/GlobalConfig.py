@@ -6,10 +6,12 @@ from monodepth.utils import download_model_if_doesnt_exist
 class Config:
     ROOT_PATH = r"/home/fangzhou/Checkpoints"
 
-    instance_split_model = os.path.join(ROOT_PATH, "yolact_im700_54_800000.pth")
+    # 实例分割模型
+    instance_model_config = os.path.join(ROOT_PATH, "rtmdet-ins_tiny_8xb32-300e_coco.py")
+    instance_model_weights = os.path.join(ROOT_PATH, "rtmdet-ins_tiny_8xb32-300e_coco_20221130_151727-ec670f7e.pth")
 
+    # 深度估计模型
     model_name = "mono+stereo_1024x320"
-
     # download_model_if_doesnt_exist(model_name)
     encoder_path = os.path.join(ROOT_PATH, model_name, "encoder.pth")
     depth_decoder_path = os.path.join(ROOT_PATH, model_name, "depth.pth")

@@ -21,8 +21,8 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 class ImageSynthesis:
     def __init__(self, config):
-        model = "/home/fangzhou/Project/mmdetection/configs/rtmdet/rtmdet-ins_tiny_8xb32-300e_coco.py"
-        weights = "/home/fangzhou/Checkpoints/rtmdet-ins_tiny_8xb32-300e_coco_20221130_151727-ec670f7e.pth"
+        model = config.instance_model_config
+        weights = config.instance_model_weights
         self.segment_inferencer = DetInferencer(model=model, weights=weights)
         self.encoder_path = config.encoder_path
         self.depth_decoder_path = config.depth_decoder_path

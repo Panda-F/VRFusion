@@ -21,6 +21,11 @@
 ```
 pip install -r requirements.txt
 ```
+### 2.2 权重文件
+```
+链接: https://pan.baidu.com/s/1s7sYUspugC1tyZmFvHpm7w?pwd=sayu 提取码: sayu  
+```
+下载后修改[GlobalConfig.py](vrBackend%2Fscene_understand%2FGlobalConfig.py) 根目录地址
 
 ## 3.接口说明
 ### 3.1 [image_synthesis.py](vrBackend%2Fscene_understand%2Fimage_synthesis.py) -> image_fusion
